@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  # ────────────────────────────────────────────────────────
+  # PostgreSQL – Hydra persistence
+  # ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra
+      POSTGRES_DB: hydra
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ────────────────────────────────────────────────────────
+  # Ory Hydra – run database migrations
+  # ────────────────────────────────────────────────────────
+  hydra-migrate:
+    image: oryd/hydra:v2.3.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://hydra:hydra@postgres:5432/hydra?sslmode=disable
+    command: migrate sql -e --yes
+    restart: on-failure
+
+  # ────────────────────────────────────────────────────────
+  # Ory Hydra – OAuth 2.0 / OIDC server
+  # ────────────────────────────────────────────────────────
+  hydra:
+    image: oryd/hydra:v2.3.0
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "4444:4444"   # Public API  (token, authorize, userinfo, …)
+      - "4445:4445"   # Admin API   (clients, introspect, …)
+    environment:
+      DSN: postgres://hydra:hydra@postgres:5432/hydra?sslmode=disable
+      URLS_SELF_ISSUER: http://localhost:4444/
+      URLS_CONSENT: http://localhost:3000/consent
+      URLS_LOGIN: http://localhost:3000/login
+      URLS_LOGOUT: http://localhost:3000/logout
+      LOG_LEVEL: info
+      OAUTH2_EXPOSE_INTERNAL_ERRORS: "true"
+      SERVE_PUBLIC_CORS_ENABLED: "true"
+      SERVE_ADMIN_CORS_ENABLED: "true"
+    command: serve all --dev
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────
+  # Hydra Admin UI (this project)
+  # ────────────────────────────────────────────────────────
+  admin-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      HYDRA_PUBLIC_URL: http://hydra:4444
+      NEXT_PUBLIC_HYDRA_ADMIN_URL: http://localhost:4445
+    depends_on:
+      - hydra
+
+volumes:
+  postgres_data:
