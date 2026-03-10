@@ -41,7 +41,12 @@ async function hydraFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
   const url = `${HYDRA_ADMIN_URL}${path}`;
+  const start = Date.now();
+
+  console.log(`[hydra] --> ${method} ${url}`);
+
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -49,6 +54,10 @@ async function hydraFetch<T>(
       ...(options.headers ?? {}),
     },
   });
+
+  console.log(
+    `[hydra] <-- ${method} ${url} ${res.status} (${Date.now() - start}ms)`
+  );
 
   if (!res.ok) {
     let message: string;
@@ -107,11 +116,17 @@ export async function introspectToken(
   if (scope) body.set("scope", scope);
 
   const url = `${HYDRA_ADMIN_URL}/admin/oauth2/introspect`;
+  const start = Date.now();
+
+  console.log(`[hydra] --> POST ${url}`);
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
+
+  console.log(`[hydra] <-- POST ${url} ${res.status} (${Date.now() - start}ms)`);
 
   if (!res.ok) {
     let message: string;
