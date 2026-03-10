@@ -64,12 +64,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked in at build time by Next.js.
+        # Override this if your Hydra Admin API is not on localhost:4445.
+        NEXT_PUBLIC_HYDRA_ADMIN_URL: http://localhost:4445
     ports:
       - "3000:3000"
     environment:
       HYDRA_ADMIN_URL: http://hydra:4445
       HYDRA_PUBLIC_URL: http://hydra:4444
-      NEXT_PUBLIC_HYDRA_ADMIN_URL: http://localhost:4445
     depends_on:
       - hydra
 

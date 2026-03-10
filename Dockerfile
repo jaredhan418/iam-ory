@@ -11,6 +11,10 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# NEXT_PUBLIC_* vars are inlined at build time by Next.js; accept them as
+# build args so the value is available during `npm run build`.
+ARG NEXT_PUBLIC_HYDRA_ADMIN_URL=http://localhost:4445
+ENV NEXT_PUBLIC_HYDRA_ADMIN_URL=$NEXT_PUBLIC_HYDRA_ADMIN_URL
 RUN npm run build
 
 # ── Runner ────────────────────────────────────────────────
