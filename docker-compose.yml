@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # ────────────────────────────────────────────────────────
   # PostgreSQL – Hydra persistence
@@ -54,7 +52,7 @@ services:
       URLS_LOGOUT: http://localhost:3000/logout
       LOG_LEVEL: info
       OAUTH2_EXPOSE_INTERNAL_ERRORS: "true"
-      OAUTH2_ACCESS_TOKEN_STRATEGY: jwt
+      STRATEGIES_ACCESS_TOKEN: jwt
       SERVE_PUBLIC_CORS_ENABLED: "true"
       SERVE_ADMIN_CORS_ENABLED: "true"
     command: serve all --dev
@@ -63,21 +61,21 @@ services:
   # ────────────────────────────────────────────────────────
   # Hydra Admin UI (this project)
   # ────────────────────────────────────────────────────────
-  admin-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        # NEXT_PUBLIC_* vars are baked in at build time by Next.js.
-        # Override this if your Hydra Admin API is not on localhost:4445.
-        NEXT_PUBLIC_HYDRA_ADMIN_URL: http://localhost:4445
-    ports:
-      - "3000:3000"
-    environment:
-      HYDRA_ADMIN_URL: http://hydra:4445
-      HYDRA_PUBLIC_URL: http://hydra:4444
-    depends_on:
-      - hydra
+  # admin-ui:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     args:
+  #       # NEXT_PUBLIC_* vars are baked in at build time by Next.js.
+  #       # Override this if your Hydra Admin API is not on localhost:4445.
+  #       NEXT_PUBLIC_HYDRA_ADMIN_URL: http://localhost:4445
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     HYDRA_ADMIN_URL: http://hydra:4445
+  #     HYDRA_PUBLIC_URL: http://hydra:4444
+  #   depends_on:
+  #     - hydra
 
 volumes:
   # WARNING: If you change SECRETS_SYSTEM after Hydra has already created OAuth
