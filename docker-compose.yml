@@ -54,6 +54,7 @@ services:
       URLS_LOGOUT: http://localhost:3000/logout
       LOG_LEVEL: info
       OAUTH2_EXPOSE_INTERNAL_ERRORS: "true"
+      OAUTH2_ACCESS_TOKEN_STRATEGY: jwt
       SERVE_PUBLIC_CORS_ENABLED: "true"
       SERVE_ADMIN_CORS_ENABLED: "true"
     command: serve all --dev
