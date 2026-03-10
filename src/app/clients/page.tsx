@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface OAuthClient {
   client_id: string;
@@ -157,6 +158,14 @@ export default function ClientsPage() {
               <p className="text-xs font-mono text-green-700 mt-1">
                 Client Secret: <strong>{createdSecret.client_secret}</strong>
               </p>
+              <div className="mt-3">
+                <Link
+                  href={`/tokens/issue?client_id=${encodeURIComponent(createdSecret.client_id)}`}
+                  className="inline-block rounded-lg bg-green-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-green-800 transition-colors"
+                >
+                  Issue Token with these credentials →
+                </Link>
+              </div>
             </div>
           )}
 

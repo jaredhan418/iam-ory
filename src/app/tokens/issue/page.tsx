@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface TokenResponse {
   access_token: string;
@@ -9,7 +10,8 @@ interface TokenResponse {
   scope?: string;
 }
 
-export default function IssueTokenPage() {
+function IssueTokenForm() {
+  const searchParams = useSearchParams();
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState("");
@@ -19,6 +21,12 @@ export default function IssueTokenPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TokenResponse | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Pre-fill client_id from ?client_id= query param (set by the Clients page)
+  useEffect(() => {
+    const id = searchParams.get("client_id");
+    if (id) setClientId(id);
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,7 +47,17 @@ export default function IssueTokenPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to issue token");
+      if (!res.ok) {
+        let msg = data.error ?? "Failed to issue token";
+        if (res.status === 401) {
+          msg =
+            "invalid_client: the client_secret does not match. " +
+            "Make sure you are using the secret shown at creation time. " +
+            "If you changed SECRETS_SYSTEM and restarted Hydra, existing " +
+            "clients are no longer valid — recreate them on the Clients page.";
+        }
+        throw new Error(msg);
+      }
       setResult(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -56,21 +74,8 @@ export default function IssueTokenPage() {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Issue M2M Token</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Obtain an OAuth 2.0 access token using the{" "}
-          <code className="font-mono bg-gray-100 px-1 rounded">
-            client_credentials
-          </code>{" "}
-          grant. The credentials are sent securely from the server to Ory
-          Hydra&apos;s token endpoint.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Form */}
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Form */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-base font-semibold text-gray-900 mb-4">
             Client Credentials
@@ -216,7 +221,27 @@ export default function IssueTokenPage() {
             </div>
           )}
         </div>
+    </div>
+  );
+}
+
+export default function IssueTokenPage() {
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Issue M2M Token</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Obtain an OAuth 2.0 access token using the{" "}
+          <code className="font-mono bg-gray-100 px-1 rounded">
+            client_credentials
+          </code>{" "}
+          grant. The credentials are sent securely from the server to Ory
+          Hydra&apos;s token endpoint.
+        </p>
       </div>
+      <Suspense fallback={null}>
+        <IssueTokenForm />
+      </Suspense>
     </div>
   );
 }

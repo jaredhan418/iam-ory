@@ -79,4 +79,8 @@ services:
       - hydra
 
 volumes:
+  # WARNING: If you change SECRETS_SYSTEM after Hydra has already created OAuth
+  # clients, Hydra will be unable to verify those clients' secrets (they were
+  # encrypted with the old key). You must recreate the volume in that case:
+  #   docker compose down -v && docker compose up -d
   postgres_data:
