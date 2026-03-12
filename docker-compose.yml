@@ -1,0 +1,106 @@
+services:
+  # ────────────────────────────────────────────────────────
+  # PostgreSQL – Hydra persistence + Admin UI auth
+  # ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra
+      POSTGRES_DB: hydra
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ────────────────────────────────────────────────────────
+  # Ory Hydra – run database migrations
+  # ────────────────────────────────────────────────────────
+  hydra-migrate:
+    image: oryd/hydra:v25.4
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://hydra:hydra@postgres:5432/hydra?sslmode=disable
+      SECRETS_SYSTEM: ${SECRETS_SYSTEM:-REPLACE-WITH-openssl-rand-hex-32}
+    command: migrate sql -e --yes
+    restart: on-failure
+
+  # ────────────────────────────────────────────────────────
+  # Ory Hydra – OAuth 2.0 / OIDC server
+  # ────────────────────────────────────────────────────────
+  hydra:
+    image: oryd/hydra:v25.4
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "4444:4444"   # Public API  (token, authorize, userinfo, …)
+      - "4445:4445"   # Admin API   (clients, introspect, …)
+    environment:
+      DSN: postgres://hydra:hydra@postgres:5432/hydra?sslmode=disable
+      SECRETS_SYSTEM: ${SECRETS_SYSTEM:-REPLACE-WITH-openssl-rand-hex-32}
+      URLS_SELF_ISSUER: http://localhost:4444/
+      URLS_CONSENT: http://localhost:3000/consent
+      URLS_LOGIN: http://localhost:3000/login
+      URLS_LOGOUT: http://localhost:3000/logout
+      LOG_LEVEL: info
+      OAUTH2_EXPOSE_INTERNAL_ERRORS: "true"
+      OAUTH2_ACCESS_TOKEN_STRATEGY: jwt
+      SERVE_PUBLIC_CORS_ENABLED: "true"
+      SERVE_ADMIN_CORS_ENABLED: "true"
+    command: serve all --dev
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────
+  # Prisma migrate – Admin UI auth schema
+  # Uses `db push` so no migration files are required.
+  # For production use `prisma migrate deploy` with committed migrations.
+  # ────────────────────────────────────────────────────────
+  prisma-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://hydra:hydra@postgres:5432/app_auth
+    command: ["npx", "prisma", "db", "push", "--accept-data-loss"]
+    restart: on-failure
+
+  # ────────────────────────────────────────────────────────
+  # Hydra Admin UI (this project)
+  # ────────────────────────────────────────────────────────
+  admin-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked in at build time by Next.js.
+        # Override this if your Hydra Admin API is not on localhost:4445.
+        NEXT_PUBLIC_HYDRA_ADMIN_URL: http://localhost:4445
+    ports:
+      - "3000:3000"
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      HYDRA_PUBLIC_URL: http://hydra:4444
+      DATABASE_URL: postgres://hydra:hydra@postgres:5432/app_auth
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set (run: openssl rand -hex 32)}
+      BETTER_AUTH_URL: http://localhost:3000
+    depends_on:
+      - hydra
+      - prisma-migrate
+
+volumes:
+  # WARNING: If you change SECRETS_SYSTEM after Hydra has already created OAuth
+  # clients, Hydra will be unable to verify those clients' secrets (they were
+  # encrypted with the old key). You must recreate the volume in that case:
+  #   docker compose down -v && docker compose up -d
+  postgres_data:
